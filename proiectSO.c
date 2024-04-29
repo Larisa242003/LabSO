@@ -7,11 +7,14 @@
 #include <fcntl.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 
 #define MAX_ARGS 10
+#define BUFFER_SIZE 1024
 
-void listFilesRecursively(const char *basePath) 
+
+void listFilesRecursively(const char *basePath,int outputFile) 
 {
     char path[1000];
     struct dirent *dp;
@@ -33,19 +36,36 @@ void listFilesRecursively(const char *basePath)
 
             if (stat(path, &st) == 0) 
             {
-                printf("File: %s\n", dp->d_name);
-                printf("Path: %s\n", path);
-                printf("Size: %ld bytes\n", st.st_size);
-                printf("Mode: %o\n", st.st_mode);
-                printf("Permissions: %o\n", st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
-                printf("Last accessed: %s", ctime(&st.st_atime));
-                printf("Last modified: %s", ctime(&st.st_mtime));
-                printf("\n");
+                char buffer[BUFFER_SIZE];
+                int n;
+
+                n = snprintf(buffer, BUFFER_SIZE, "File: %s\n", dp->d_name);
+                write(outputFile, buffer, n);
+
+                n = snprintf(buffer, BUFFER_SIZE, "Path: %s\n", path);
+                write(outputFile, buffer, n);
+
+                n = snprintf(buffer, BUFFER_SIZE, "Size: %ld bytes\n", st.st_size);
+                write(outputFile, buffer, n);
+
+                n = snprintf(buffer, BUFFER_SIZE, "Mode: %o\n", st.st_mode);
+                write(outputFile, buffer, n);
+
+                n = snprintf(buffer, BUFFER_SIZE, "Permissions: %o\n", st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
+                write(outputFile, buffer, n);
+
+                n = snprintf(buffer, BUFFER_SIZE, "Last accessed: %s", ctime(&st.st_atime));
+                write(outputFile, buffer, strlen(buffer));
+
+                n = snprintf(buffer, BUFFER_SIZE, "Last modified: %s", ctime(&st.st_mtime));
+                write(outputFile, buffer, strlen(buffer));
+
+                write(outputFile, "\n", 1);
             }
 
             if (S_ISDIR(st.st_mode)) 
             {
-                listFilesRecursively(path);
+                listFilesRecursively(path,outputFile);
             }
         }
     }
@@ -64,6 +84,12 @@ int main(int argc,char* argv[])
         exit(-1);
     }
 
+    int outputFile = open("outputFile.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (outputFile == -1) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+
     for(int i = 1; i < argc; i++)
     {
         if(stat(argv[i], &st) == -1)
@@ -80,9 +106,13 @@ int main(int argc,char* argv[])
             continue;
         }
 
-        printf("Metadatele pentru directorul: %s\n", argv[i]);
-        listFilesRecursively(argv[i]);
+        char header[100];
+        snprintf(header, 100, "Metadatele pentru directorul: %s\n", argv[i]);
+        write(outputFile, header, strlen(header));
+        listFilesRecursively(argv[i], outputFile);
     }
+
+    close(outputFile);
 
     return 0;
 }
