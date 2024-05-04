@@ -13,6 +13,39 @@
 #define MAX_ARGS 10
 #define BUFFER_SIZE 1024
 
+void printDirectory(const char *basePath, int depth) 
+{
+    DIR *dir;
+    struct dirent *dp;
+    struct stat st;
+
+    if ((dir = opendir(basePath)) == NULL) 
+    {
+        perror("Unable to open directory");
+        exit(EXIT_FAILURE);
+    }
+
+    while ((dp = readdir(dir)) != NULL) 
+    {
+        if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0) 
+        {
+            for (int i = 0; i < depth; i++) 
+            {
+                printf("    ");
+            }
+            printf("|-- %s\n", dp->d_name);
+
+            char path[1024];
+            snprintf(path,BUFFER_SIZE, "%s/%s", basePath, dp->d_name);
+            if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) 
+            {
+                printDirectory(path, depth + 1);
+            }
+        }
+    }
+
+    closedir(dir);
+}
 
 void listFilesRecursively(const char *basePath,int outputFile) 
 {
@@ -111,6 +144,8 @@ int main(int argc,char* argv[])
         write(outputFile, header, strlen(header));
         listFilesRecursively(argv[i], outputFile);
     }
+
+    printDirectory(argv[1],0);
 
     close(outputFile);
 
