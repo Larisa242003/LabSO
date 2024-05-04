@@ -216,7 +216,7 @@ for (int i = 0; i < inputCount; i++)
     printf("Procesul Copil %d s-a încheiat cu PID %d și cod de ieșire %d\n", i+3, terminated_pid, status);
 }
 
-    //printDirectory(argv[3],0);
+    printDirectory(argv[3],0);
 
     close(outputFile);
 
