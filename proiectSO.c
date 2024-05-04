@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <string.h>
 #include <time.h>
@@ -176,27 +177,44 @@ int main(int argc,char* argv[])
     exit(EXIT_FAILURE);
     }
 
-    for(int i = 3; i < inputCount; i++)
+    for(int i = 0; i < inputCount; i++)
     {
         if(stat(inputDirs[i], &st) == -1)
         {
             perror("Eroare la stat");
-            printf(": %s\n", argv[i]);
+            printf(": %s\n", inputDirs[i]);
             continue;
         }
 
         if(!S_ISDIR(st.st_mode))
         {
             printf("DEBUG: Mode for %s is %o\n", argv[i], st.st_mode);
-            printf("%s nu este un director, va fi ignorat.\n", argv[i]);
+            printf("%s nu este un director, va fi ignorat.\n", inputDirs[i]);
             continue;
         }
 
-        char header[100];
-        snprintf(header, 100, "Metadatele pentru directorul: %s\n", inputDirs[i]);
-        write(outputFile, header, strlen(header));
-        listFilesRecursively(inputDirs[i], outputFile);
+        pid_t pid=fork();
+        if (pid == -1) 
+        {
+            perror("Error: fork failed");
+            exit(-1);
+
+        }else if(pid==0)
+        {
+            char header[100];
+            snprintf(header, 100, "Metadatele pentru directorul: %s\n", inputDirs[i]);
+            write(outputFile, header, strlen(header));
+            listFilesRecursively(inputDirs[i], outputFile);
+            exit(EXIT_SUCCESS);
+        }
+        
     }
+for (int i = 0; i < inputCount; i++)
+{
+    int status;
+    pid_t terminated_pid = wait(&status); // Wait for any child process to terminate
+    printf("Procesul Copil %d s-a încheiat cu PID %d și cod de ieșire %d\n", i+3, terminated_pid, status);
+}
 
     //printDirectory(argv[3],0);
 
