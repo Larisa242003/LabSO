@@ -83,9 +83,15 @@ void listFilesRecursively(const char *basePath,int outputFile)
                 permissions[7] = (st.st_mode & S_IWOTH) ? 'w' : '-';
                 permissions[8] = (st.st_mode & S_IXOTH) ? 'x' : '-';
                 permissions[9] = '\0';
-                
+
                 n = snprintf(buffer, BUFFER_SIZE, "File: %s\n", dp->d_name);
-                write(outputFile, buffer, n);
+                int bytesWritten=write(outputFile, buffer, n);
+                if (bytesWritten == -1) 
+                {
+                perror("Eroare la scrierea in fisier");
+                close(outputFile);
+                exit(EXIT_FAILURE);
+                }
 
                 n = snprintf(buffer, BUFFER_SIZE, "Path: %s\n", path);
                 write(outputFile, buffer, n);
@@ -122,22 +128,57 @@ int main(int argc,char* argv[])
 {
     struct stat st;
 
+    char *outputDir = NULL;
+    char *inputDirs[MAX_ARGS];
+    int inputCount = 0;
 
-    if(argc < 2 || argc > MAX_ARGS + 1)
+
+    if(argc < 3 || argc > MAX_ARGS + 1)
     {
         perror("Eroare: Numar invalid de argumente");
         exit(-1);
     }
 
-    int outputFile = open("outputFile.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (outputFile == -1) {
-        perror("Error opening file");
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "-o") == 0) 
+        {
+            if (i + 1 < argc) 
+            {
+                outputDir = argv[i + 1];
+                i++;
+            }
+            else 
+            {
+                fprintf(stderr, "Eroare: Directorul de iesire lipseste pentru optiunea -o\n");
+                exit(EXIT_FAILURE);
+            }
+        } 
+        else 
+        {
+            inputDirs[inputCount++] = argv[i];
+        }
+    }
+
+    if (outputDir == NULL) 
+    {
+        fprintf(stderr, "Eroare: Directorul de iesire nu este specificat. Utilizati optiunea -o\n");
         exit(EXIT_FAILURE);
     }
 
-    for(int i = 1; i < argc; i++)
+    char outputPath[BUFFER_SIZE];
+    snprintf(outputPath, BUFFER_SIZE, "%s/outputFile.txt", outputDir);
+    int outputFile = open(outputPath, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+
+    if (outputFile == -1) 
     {
-        if(stat(argv[i], &st) == -1)
+    perror("Eroare la deschiderea fisierului de iesire");
+    exit(EXIT_FAILURE);
+    }
+
+    for(int i = 3; i < inputCount; i++)
+    {
+        if(stat(inputDirs[i], &st) == -1)
         {
             perror("Eroare la stat");
             printf(": %s\n", argv[i]);
@@ -152,12 +193,12 @@ int main(int argc,char* argv[])
         }
 
         char header[100];
-        snprintf(header, 100, "Metadatele pentru directorul: %s\n", argv[i]);
+        snprintf(header, 100, "Metadatele pentru directorul: %s\n", inputDirs[i]);
         write(outputFile, header, strlen(header));
-        listFilesRecursively(argv[i], outputFile);
+        listFilesRecursively(inputDirs[i], outputFile);
     }
 
-    printDirectory(argv[1],0);
+    //printDirectory(argv[3],0);
 
     close(outputFile);
 
