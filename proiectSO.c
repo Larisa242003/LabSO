@@ -72,6 +72,18 @@ void listFilesRecursively(const char *basePath,int outputFile)
                 char buffer[BUFFER_SIZE];
                 int n;
 
+                char permissions[11];
+                permissions[0] = (st.st_mode & S_IRUSR) ? 'r' : '-';
+                permissions[1] = (st.st_mode & S_IWUSR) ? 'w' : '-';
+                permissions[2] = (st.st_mode & S_IXUSR) ? 'x' : '-';
+                permissions[3] = (st.st_mode & S_IRGRP) ? 'r' : '-';
+                permissions[4] = (st.st_mode & S_IWGRP) ? 'w' : '-';
+                permissions[5] = (st.st_mode & S_IXGRP) ? 'x' : '-';
+                permissions[6] = (st.st_mode & S_IROTH) ? 'r' : '-';
+                permissions[7] = (st.st_mode & S_IWOTH) ? 'w' : '-';
+                permissions[8] = (st.st_mode & S_IXOTH) ? 'x' : '-';
+                permissions[9] = '\0';
+                
                 n = snprintf(buffer, BUFFER_SIZE, "File: %s\n", dp->d_name);
                 write(outputFile, buffer, n);
 
@@ -84,7 +96,7 @@ void listFilesRecursively(const char *basePath,int outputFile)
                 n = snprintf(buffer, BUFFER_SIZE, "Mode: %o\n", st.st_mode);
                 write(outputFile, buffer, n);
 
-                n = snprintf(buffer, BUFFER_SIZE, "Permissions: %o\n", st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
+                n = snprintf(buffer, BUFFER_SIZE, "Permissions: %s\n", permissions);
                 write(outputFile, buffer, n);
 
                 n = snprintf(buffer, BUFFER_SIZE, "Last accessed: %s", ctime(&st.st_atime));
