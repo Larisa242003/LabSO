@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <libgen.h> 
 #include <stdbool.h>
 
 
@@ -59,10 +60,6 @@ void printDirectory(const char *basePath, int depth)
     closedir(dir);
 }
 
-bool are_all_permissions_missing(const struct stat *st) 
-{
-    return !(st->st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
-}
 
 /*
 
@@ -95,9 +92,11 @@ bool performSyntacticAnalysis(const char *filePath) {
 }
 */
 
-void isolateDangerousFile(const char *filePath, const char *outputDir) {
+void isolateDangerousFile(const char *filePath, const char *outputDir) 
+{
     char *fileName = strrchr(filePath, '/');
-    if (fileName == NULL) {
+    if (fileName == NULL) 
+    {
         fprintf(stderr, "Error: Invalid file path [%s]\n", filePath);
         return;
     }
@@ -108,7 +107,8 @@ void isolateDangerousFile(const char *filePath, const char *outputDir) {
 
     printf("Attempting to move [%s] to [%s]\n", filePath, destPath);
 
-    if (rename(filePath, destPath) == -1) {
+    if (rename(filePath, destPath) == -1) 
+    {
         perror("Error: Unable to move file to isolated directory");
         return;
     }
@@ -116,32 +116,20 @@ void isolateDangerousFile(const char *filePath, const char *outputDir) {
     printf("File successfully isolated: %s\n", destPath);
 }
 
-/*
-void checkAndIsolateDangerousFile(const char *filePath, const char *outputDir) {
-    struct stat st;
-    if (stat(filePath, &st) == -1) {
-        perror("Error: Unable to get file status");
-        return;
-    }
 
-    // Directly analyze file content
-    if (performSyntacticAnalysis(filePath) || are_all_permissions_missing(&st)) {
-        printf("Dangerous content detected in %s\n", filePath);
-        isolateDangerousFile(filePath, outputDir);
-    } else {
-        printf("No dangerous content found in %s\n", filePath);
-    }
-}*/
 
-void checkPermissionsAndAnalyze(const char *filePath, const char *safeDir) {
+void checkPermissionsAndAnalyze(const char *filePath, const char *safeDir) 
+{
     struct stat st;
-    if (stat(filePath, &st) == -1) {
+    if (stat(filePath, &st) == -1) 
+    {
         perror("Error: Unable to get file status");
         exit(EXIT_FAILURE);
     }
 
     // We expect no permissions for user, group, and others (0 permissions)
-    if ((st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) == 0) {
+    if ((st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) == 0)
+    {
         printf("No permissions found for file %s, possible tampering detected.\n", filePath);
         
 
@@ -167,70 +155,24 @@ void checkPermissionsAndAnalyze(const char *filePath, const char *safeDir) {
     }
 }
 
-void updateSnapshot(const char *dirPath, struct Snapshot *oldSnapshot)
-{
-    struct stat st;
-    if (stat(dirPath, &st) != -1)
-    {
-        strcpy(oldSnapshot->path, dirPath);
-        oldSnapshot->lastModified = st.st_mtime;
-        oldSnapshot->size = st.st_size;
-        oldSnapshot->mode = st.st_mode;
 
-        oldSnapshot->permissions[0] = (st.st_mode & S_IRUSR) ? 'r' : '-';
-        oldSnapshot->permissions[1] = (st.st_mode & S_IWUSR) ? 'w' : '-';
-        oldSnapshot->permissions[2] = (st.st_mode & S_IXUSR) ? 'x' : '-';
-        oldSnapshot->permissions[3] = (st.st_mode & S_IRGRP) ? 'r' : '-';
-        oldSnapshot->permissions[4] = (st.st_mode & S_IWGRP) ? 'w' : '-';
-        oldSnapshot->permissions[5] = (st.st_mode & S_IXGRP) ? 'x' : '-';
-        oldSnapshot->permissions[6] = (st.st_mode & S_IROTH) ? 'r' : '-';
-        oldSnapshot->permissions[7] = (st.st_mode & S_IWOTH) ? 'w' : '-';
-        oldSnapshot->permissions[8] = (st.st_mode & S_IXOTH) ? 'x' : '-';
-        oldSnapshot->permissions[9] = '\0';
-        
-        oldSnapshot->lastAccessed = st.st_atime;            
-    
-    }
-}
-
-void compareAndChangeSnapshots(const char *filePath, struct Snapshot *oldSnapshot, int outputFile)
-{
-    dprintf(outputFile,"Comparing snapshots for file: %s\n", filePath); // Debugging statement
-
-    struct Snapshot newSnapshot={0};
-    updateSnapshot(filePath, &newSnapshot);
-
-    if (newSnapshot.lastModified != oldSnapshot->lastModified || 
-        newSnapshot.size != oldSnapshot->size ||
-        newSnapshot.mode != oldSnapshot->mode || 
-        strcmp(newSnapshot.permissions, oldSnapshot->permissions) != 0)
-    {
-        dprintf(outputFile, "Snapshot Path: %s\n", filePath);
-        dprintf(outputFile, "Last Modified: %s", ctime(&newSnapshot.lastModified));
-        dprintf(outputFile, "Last Accessed: %s", ctime(&newSnapshot.lastAccessed));
-        dprintf(outputFile, "Size: %d bytes\n", newSnapshot.size);
-        dprintf(outputFile, "Mode: %o\n", newSnapshot.mode);
-        dprintf(outputFile, "Permissions: %s\n", newSnapshot.permissions);
-        dprintf(outputFile, "Changes detected in snapshot. Snapshot updated.\n\n");
-
-        *oldSnapshot = newSnapshot;
-    }
-    else
-    {
-        dprintf(outputFile,"No changes detected in file: %s\n", filePath);
-    }   
-}
-
-
-
-void listFilesRecursively(const char *basePath, int outputFile,const char *outputDirMalitious)
+void listFilesRecursively( char *dirPath,const char* outputDir,const char *outputDirMalitious)
 {
     char path[1000];
     struct dirent *dp;
     struct stat st;
-    struct Snapshot snapshot={0};
+//    struct Snapshot snapshot={0};
 
-    DIR *dir = opendir(basePath);
+    DIR *dir = opendir(dirPath);
+
+    char outputPath[BUFFER_SIZE];
+    snprintf(outputPath, BUFFER_SIZE, "%s/%s_metadata.txt", outputDir, basename(dirPath));
+    int snapshotFile = open(outputPath, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (snapshotFile == -1) 
+    {
+        perror("Eroare la deschiderea fisierului de iesire");
+        exit(EXIT_FAILURE);
+    }
 
     if (!dir)
     {
@@ -242,7 +184,7 @@ void listFilesRecursively(const char *basePath, int outputFile,const char *outpu
     {
         if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
         {
-            sprintf(path, "%s/%s", basePath, dp->d_name);
+            sprintf(path, "%s/%s", dirPath, dp->d_name);
 
             if (stat(path, &st) == 0)
             {
@@ -260,30 +202,28 @@ void listFilesRecursively(const char *basePath, int outputFile,const char *outpu
                 permissions[7] = (st.st_mode & S_IWOTH) ? 'w' : '-';
                 permissions[8] = (st.st_mode & S_IXOTH) ? 'x' : '-';
                 permissions[9] = '\0';
-                n = snprintf(buffer, BUFFER_SIZE, "File: %s\n", dp->d_name);
                 n = snprintf(buffer, BUFFER_SIZE, "Path: %s\n", path);
-                write(outputFile, buffer, n);
+                write(snapshotFile, buffer, n);
                 n = snprintf(buffer, BUFFER_SIZE, "Size: %ld bytes\n", st.st_size);
-                write(outputFile, buffer, n);
+                write(snapshotFile, buffer, n);
                 n = snprintf(buffer, BUFFER_SIZE, "Mode: %o\n", st.st_mode);
-                write(outputFile, buffer, n);
+                write(snapshotFile, buffer, n);
                 n = snprintf(buffer, BUFFER_SIZE, "Permissions: %s\n", permissions);
-                write(outputFile, buffer, n);
+                write(snapshotFile, buffer, n);
                 n = snprintf(buffer, BUFFER_SIZE, "Last accessed: %s", ctime(&st.st_atime));
-                write(outputFile, buffer, strlen(buffer));
+                write(snapshotFile, buffer, strlen(buffer));
                 n = snprintf(buffer, BUFFER_SIZE, "Last modified: %s", ctime(&st.st_mtime));
-                write(outputFile, buffer, strlen(buffer));
-                write(outputFile, "\n", 1);
+                write(snapshotFile, buffer, strlen(buffer));
+                write(snapshotFile, "\n", 1);
                 //checkAndIsolateDangerousFile(path,outputDirMalitious);
                 checkPermissionsAndAnalyze(path,outputDirMalitious);
-                compareAndChangeSnapshots(path, &snapshot, outputFile);
-
+                //compareAndChangeSnapshots(path, &snapshot, outputFile);
           
             }
 
             if (S_ISDIR(st.st_mode))
             {
-                listFilesRecursively(path, outputFile,outputDirMalitious);
+                listFilesRecursively(dirPath,outputDir,outputDirMalitious);
             }
             
            
@@ -355,14 +295,6 @@ int main(int argc,char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    char outputPath[BUFFER_SIZE];
-    snprintf(outputPath, BUFFER_SIZE, "%s/outputFile.txt", outputDir);
-    int outputFile = open(outputPath, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (outputFile == -1) 
-    {
-        perror("Eroare la deschiderea fisierului de iesire");
-        exit(EXIT_FAILURE);
-    }
     for(int i = 0; i < inputCount; i++)
     {
         if(stat(inputDirs[i], &st) == -1)
@@ -384,10 +316,9 @@ int main(int argc,char* argv[])
             exit(-1);
         }else if(pid==0)
         {
-            char header[100];
-            snprintf(header, 100, "Metadatele pentru directorul: %s\n", inputDirs[i]);
-            write(outputFile, header, strlen(header));
-            listFilesRecursively(inputDirs[i], outputFile,outputDirMalitious);
+            listFilesRecursively(inputDirs[i],outputDir,outputDirMalitious);
+            printDirectory(inputDirs[i],0);
+            printf("\n");
             exit(EXIT_SUCCESS);
         }
 
@@ -397,11 +328,11 @@ for (int i = 0; i < inputCount; i++)
 {
     int status;
     pid_t terminated_pid = wait(&status);
-    printf("Procesul Copil %d s-a incheiat cu PID %d si cod de iesire %d\n", i+3, terminated_pid, status);
+    printf("Captura pentru directorul %d creata cu succes\n",i+1);
+    printf("Procesul Copil %d s-a incheiat cu PID %d si cod de iesire %d\n", i+1, terminated_pid, status);
 }
 
+    
 
-    printDirectory(argv[5],0);
-    close(outputFile);
     return 0;
 }
